@@ -29,8 +29,7 @@ load_dotenv(REPO / "wiki_agent" / ".env")
 
 if not os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY") == "your-api-key-here":
     print(
-        "GOOGLE_API_KEY not set. Copy wiki_agent/.env.example to wiki_agent/.env and add your key.\n"
-        "Until then, run: python scripts/offline_demo_ingest.py",
+        "GOOGLE_API_KEY not set. Copy wiki_agent/.env.example to wiki_agent/.env and add your key.",
         file=sys.stderr,
     )
     sys.exit(1)

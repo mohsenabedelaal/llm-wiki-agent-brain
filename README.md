@@ -166,9 +166,8 @@ Refresh Obsidian on this folder to see the graph fill in.
 
 ```powershell
 adk run wiki_agent                     # interactive CLI
-python scripts\adk_demo.py             # scripted live demo
-python scripts\offline_demo_ingest.py  # rebuild seed wiki without an API key
-pytest -q                              # run 8 sandbox + PDF tests
+python scripts\adk_demo.py             # scripted live demo (requires API key)
+pytest -q                              # run sandbox + PDF tests
 ```
 
 For Overwatch-style integration later:
@@ -201,7 +200,7 @@ llm-wiki-agent-brain/
 │   ├── agent.py                root_agent (Gemini + tools)
 │   ├── prompts.py              Ingest / query / lint / save playbooks
 │   └── tools/vault.py          Path-safe file + PDF tools
-├── scripts/                    adk_demo · offline_demo_ingest · build_sample_pdf
+├── scripts/                    adk_demo · build_sample_pdf (test fixture helper)
 ├── tests/                      Path sandbox + PDF extraction
 ├── AGENTS.md                   Agent rules (source of truth)
 ├── WIKI.md                     Vault schema conventions
