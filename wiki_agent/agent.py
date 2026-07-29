@@ -1,6 +1,6 @@
 """ADK root agent for the DistrictNex LLM Wiki."""
 
-from google.adk.agents.llm_agent import Agent
+from google.adk.agents import Agent
 
 from .prompts import INSTRUCTION
 from .tools.vault import (
