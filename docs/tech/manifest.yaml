@@ -1,0 +1,50 @@
+# Official tech-doc corpus used by the PR review Action.
+# Manual drops go under docs/tech/<id>/. The docs_fetcher_agent may refresh
+# pages only from the `url` values listed here (or subpaths of those URLs).
+
+sources:
+- id: google-adk
+  title: Google Agent Development Kit
+  url: https://google.github.io/adk-docs/
+  local_dir: google-adk
+  keywords:
+  - adk
+  - google.adk
+  - wiki_agent
+  - docs_fetcher_agent
+  - Agent
+  - function tools
+  notes: Refreshed ADK docs (Agents and Tools snapshots).
+  fetched_at: '2026-08-25T13:20:43Z'
+- id: gemini
+  title: Gemini API
+  url: https://ai.google.dev/gemini-api/docs
+  local_dir: gemini
+  keywords:
+  - gemini
+  - google.genai
+  - GOOGLE_API_KEY
+  - generate_content
+  notes: Refreshed Gemini API docs (Interactions / generate_content).
+  fetched_at: '2026-08-25T13:20:43Z'
+- id: pypdf
+  title: pypdf
+  url: https://pypdf.readthedocs.io/en/stable/
+  local_dir: pypdf
+  keywords:
+  - pypdf
+  - PdfReader
+  - read_pdf
+  notes: Refreshed pypdf docs (PdfReader / text extraction).
+  fetched_at: '2026-08-25T13:20:43Z'
+- id: pytest
+  title: pytest
+  url: https://docs.pytest.org/en/stable/
+  local_dir: pytest
+  keywords:
+  - pytest
+  - tests/
+  - fixture
+  - monkeypatch
+  notes: Refreshed pytest docs (fixtures, scopes, teardown).
+  fetched_at: '2026-08-25T13:20:43Z'

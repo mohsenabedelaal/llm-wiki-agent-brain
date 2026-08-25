@@ -15,6 +15,7 @@ Read and follow `WIKI.md` for full conventions. Summary:
 7. On questions: read `wiki/hot.md` → `wiki/index.md` → relevant pages. Cite wiki pages. Offer to file valuable answers back.
 8. Extract **tables and numeric specs carefully** into entity pages with exact values and units — these drive Overwatch alert baselines.
 9. **PDF-first**: most real sources are manuals/reports as PDF. Use `read_pdf` for those; preserve units; never invent missing values.
+10. **Repo-relative paths only** in tool calls and docs (e.g. `wiki/index.md`, `raw/manuals/foo.pdf`). Never hard-code absolute machine paths.
 
 ## Common commands (via ADK Web / `adk run`)
 

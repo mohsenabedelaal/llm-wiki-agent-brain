@@ -116,6 +116,8 @@ flowchart LR
 | Session save (file Q&A back into vault)                             | Ready                      |
 | Obsidian graph view                                                 | Ready (open repo as vault) |
 | Path sandbox tests + PDF extraction tests                           | Ready (`pytest -q`)        |
+| Docs-grounded GitHub PR review (inline comments vs `docs/tech/`)    | Ready (Actions + `python -m pr_review`) |
+| Official tech-docs fetcher agent (`docs_fetcher_agent`)             | Ready (`adk run docs_fetcher_agent`) |
 | Scanned-PDF OCR                                                     | Not in v1                  |
 | Multi-writer concurrency locks                                      | Not in v1                  |
 | REST API deployment (`adk api_server`)                              | Available; not deployed    |
@@ -141,9 +143,9 @@ flowchart LR
 ## Quick start
 
 ```powershell
-cd C:\Users\Admin\programming\picacity-projects\llm-wiki-agent-brain
+# From this repository root (any machine / OS):
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1   # Windows; on Unix: source .venv/bin/activate
 pip install -r requirements.txt
 Copy-Item wiki_agent\.env.example wiki_agent\.env
 # Edit wiki_agent\.env and set GOOGLE_API_KEY=...
@@ -196,15 +198,20 @@ llm-wiki-agent-brain/
 │   ├── entities/               AHU-3, LP-3, F-34, equipment…
 │   ├── concepts/               Baselines, modes, faults…
 │   └── sessions/               Filed Q&A answers
+├── docs/tech/                  Official framework docs for PR review
+│   ├── manifest.yaml           Stack → URL + local folder
+│   └── <stack>/                Markdown snapshots (ADK, Gemini, pypdf, pytest)
+├── pr_review/                  CI one-shot: Gemini review → inline GitHub comments
+├── docs_fetcher_agent/         ADK agent: fetch/refresh docs/tech from the manifest
 ├── wiki_agent/                 Google ADK package
 │   ├── agent.py                root_agent (Gemini + tools)
 │   ├── prompts.py              Ingest / query / lint / save playbooks
 │   └── tools/vault.py          Path-safe file + PDF tools
 ├── scripts/                    adk_demo · build_sample_pdf (test fixture helper)
 ├── tests/                      Path sandbox + PDF extraction
-├── AGENTS.md                   Agent rules (source of truth)
+├── AGENTS.md                   Wiki agent rules (source of truth)
 ├── WIKI.md                     Vault schema conventions
-└── docs/HOW-IT-WORKS.md        End-to-end walkthrough
+└── .github/workflows/          pr-docs-review.yml
 ```
 
 ---
@@ -225,8 +232,8 @@ llm-wiki-agent-brain/
 
 ## Docs
 
-- [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) — end-to-end flow walkthrough
-- [AGENTS.md](AGENTS.md) — agent rules
+- [docs/tech/README.md](docs/tech/README.md) — official tech-doc corpus + PR review Action
+- [AGENTS.md](AGENTS.md) — wiki agent rules
 - [WIKI.md](WIKI.md) — vault conventions
 - [Google ADK](https://adk.dev/) — framework
 - [Karpathy LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — pattern origin
