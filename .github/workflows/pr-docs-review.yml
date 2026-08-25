@@ -1,11 +1,11 @@
-name: Docs-grounded PR review
+name: PR review
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 concurrency:
-  group: pr-docs-review-${{ github.event.pull_request.number }}
+  group: pr-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -23,12 +23,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install PR review dependencies
+        run: pip install -r pr_review/requirements.txt
 
-      - name: Review PR against official tech docs
+      # Host repo can be any language. This job only needs Python to run pr_review.
+
+      - name: Review pull request
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          # Optional: override model, e.g. gemini-2.5-pro
+          # GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
         run: python -m pr_review --pr ${{ github.event.pull_request.number }} --docs docs/tech

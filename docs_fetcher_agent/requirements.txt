@@ -1,0 +1,2 @@
+# Docs fetcher extras (CLI). google-adk is optional (only for `adk run`).
+pyyaml>=6.0.0

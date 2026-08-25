@@ -1,4 +1,4 @@
-"""Ask Gemini for a senior-engineer, docs-grounded PR review as JSON."""
+"""Ask Gemini for a senior-engineer PR review as JSON (portable across repos)."""
 
 from __future__ import annotations
 
@@ -30,36 +30,68 @@ REVIEW_SCHEMA: dict[str, Any] = {
                         "type": "STRING",
                         "enum": ["blocker", "should-fix", "nit"],
                     },
+                    "category": {
+                        "type": "STRING",
+                        "enum": [
+                            "correctness",
+                            "regression",
+                            "security",
+                            "api-docs",
+                            "tests",
+                            "maintainability",
+                            "conventions",
+                            "performance",
+                        ],
+                    },
                     "body": {"type": "STRING"},
-                    "doc_path": {"type": "STRING"},
+                    "doc_path": {
+                        "type": "STRING",
+                        "nullable": True,
+                        "description": "Tech-doc or convention file path when applicable; omit or null otherwise.",
+                    },
                     "section": {"type": "STRING", "nullable": True},
                 },
-                "required": ["path", "severity", "body", "doc_path"],
+                "required": ["path", "severity", "category", "body"],
             },
         },
     },
     "required": ["summary", "findings"],
 }
 
-SYSTEM_PROMPT = """You are a senior software engineer reviewing a GitHub pull request.
+SYSTEM_PROMPT = """You are a lead / senior software engineer reviewing a GitHub pull request
+for an arbitrary repository. This workflow is portable — do not assume any specific product
+domain. Judge from: the PR description, the diff, full changed-file contents when provided,
+optional official tech docs, and optional project convention files.
 
-Review against the provided official tech docs first. Prefer:
-1. Correctness and API misuse versus those docs
-2. Security (path traversal, leaked secrets, unbounded network/file IO)
-3. Behavioral regressions
-4. Missing tests for new behavior
+Review priorities (highest first):
+1. Correctness bugs and logic errors visible in the change
+2. Behavioral regressions / broken contracts with surrounding code you can see
+3. Security (injection, path traversal, secret leakage, authz gaps, unsafe deserialization,
+   unbounded network/file IO)
+4. API misuse versus provided official tech docs (when docs are present)
+5. Missing or weak tests for new/changed behavior
+6. Maintainability and bad practices (dead code, misleading names, swallowed errors,
+   god functions, brittle coupling) — only when actionable
+7. Project conventions when CONTRIBUTING/AGENTS/CLAUDE/.cursorrules (or similar) are provided
+8. Clear performance foot-guns in hot paths
 
-Ignore pure style nits unless they hide a real bug. Cap findings at 20, highest severity first.
-Never rubber-stamp or approve. If the diff is clean versus the docs, say so in the summary
-and return an empty findings array.
-
-Each finding MUST:
-- Anchor to a changed file. Use `line` + `side` (`RIGHT` for additions/context, `LEFT` for deletions)
-  from the COMMENTABLE ANCHORS list. If no single line fits, omit `line` (file-level).
-- Cite `doc_path` of the tech-doc file you used (and `section` when possible).
-- Write `body` as a senior review comment: what is wrong, why (doc rule), and a concrete fix.
-
-Do not comment on files that are not in the diff.
+Rules:
+- Prefer fewer high-signal findings over style nits. Ignore pure formatting/import-order nits
+  unless they hide a real bug.
+- Cap findings at 20, highest severity first.
+- Never rubber-stamp or approve. If the change looks solid, say so in the summary and return
+  an empty findings array.
+- You may raise findings that are NOT grounded in tech docs. Use category accordingly.
+- Cite `doc_path` only when a provided tech doc or convention file actually supports the claim.
+  Otherwise leave `doc_path` null — do not invent citations.
+- Anchor each finding to a changed file. Use `line` + `side` from COMMENTABLE ANCHORS
+  (`RIGHT` for additions/context, `LEFT` for deletions). If no single line fits, omit `line`
+  (file-level).
+- Write `body` like a lead review comment: what is wrong, why it matters, and a concrete fix.
+- Do not comment on files that are not in the diff.
+- Use the Diff plus Before/After file bodies as the source of truth for what changed.
+  The After (head) body is the new file; Before (base) is the previous version.
+  Do not invent surrounding callers you cannot see.
 """
 
 
@@ -81,14 +113,20 @@ def _parse_findings(raw: list[dict[str, Any]]) -> list[Finding]:
         side = str(item.get("side") or "RIGHT").upper()
         if side not in {"LEFT", "RIGHT"}:
             side = "RIGHT"
+        doc_raw = item.get("doc_path")
+        doc_path = str(doc_raw).strip() if doc_raw else None
+        if doc_path in {"", "null", "none", "(unspecified)"}:
+            doc_path = None
+        category = str(item.get("category") or "correctness").strip() or "correctness"
         findings.append(
             Finding(
                 path=path,
                 line=line,
                 side=side,
                 severity=severity,
+                category=category,
                 body=str(item.get("body") or "").strip(),
-                doc_path=str(item.get("doc_path") or "").strip() or "(unspecified)",
+                doc_path=doc_path,
                 section=(str(item["section"]) if item.get("section") else None),
             )
         )
@@ -117,11 +155,15 @@ def build_user_prompt(
     body: str,
     diff_block: str,
     docs_block: str,
+    conventions_block: str,
+    files_block: str,
     anchors_block: str,
 ) -> str:
     return (
         f"## Pull request\n\n**Title:** {title}\n\n{body or '(no description)'}\n\n"
-        f"## Official tech docs\n\n{docs_block}\n\n"
+        f"## Project conventions (if any)\n\n{conventions_block}\n\n"
+        f"## Official tech docs (if any)\n\n{docs_block}\n\n"
+        f"## Changed files (index + before/after bodies)\n\n{files_block}\n\n"
         f"## Diff\n\n{diff_block}\n\n"
         f"## COMMENTABLE ANCHORS\n\nOnly use these (path, line, side) pairs:\n{anchors_block}\n"
     )
@@ -140,6 +182,8 @@ def generate_review(
     body: str,
     diff_block: str,
     docs_block: str,
+    conventions_block: str,
+    files_block: str,
     anchors: set,
     api_key: str | None = None,
 ) -> ReviewResult:
@@ -156,6 +200,8 @@ def generate_review(
         body=body or "",
         diff_block=diff_block,
         docs_block=docs_block,
+        conventions_block=conventions_block,
+        files_block=files_block,
         anchors_block=format_anchors(anchors),
     )
     response = client.models.generate_content(

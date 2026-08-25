@@ -1,4 +1,4 @@
-"""CLI: review a GitHub PR against docs/tech and post inline comments."""
+"""CLI: review a GitHub PR and post inline comments (portable across repos)."""
 
 from __future__ import annotations
 
@@ -7,11 +7,13 @@ import json
 import sys
 from pathlib import Path
 
+from .context import format_pr_file_context, load_project_conventions
 from .diff import commentable_from_files, format_diff_for_prompt
 from .docs_loader import format_docs_for_prompt, load_tech_docs
 from .gemini_review import generate_review
 from .github_post import (
     build_review_payload,
+    fetch_file_at_ref,
     fetch_pull_files,
     fetch_pull_request,
     filter_findings,
@@ -42,16 +44,21 @@ def resolve_docs_root(docs: Path) -> Path:
     return cwd_candidate
 
 
+def resolve_repo_root() -> Path:
+    """Checkout root: GitHub Actions and local CLI always run from the repo cwd."""
+    return Path.cwd().resolve()
+
+
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Docs-grounded GitHub PR review (inline comments)."
+        description="Senior-engineer GitHub PR review with optional tech-doc grounding."
     )
     p.add_argument("--pr", type=int, required=True, help="Pull request number")
     p.add_argument(
         "--docs",
         type=Path,
         default=DEFAULT_DOCS,
-        help="Path to tech-doc corpus (default: docs/tech, relative to cwd)",
+        help="Optional tech-doc corpus (default: docs/tech, relative to cwd)",
     )
     p.add_argument("--repo", default=None, help="owner/name (default: GITHUB_REPOSITORY)")
     p.add_argument(
@@ -70,6 +77,7 @@ def run(argv: list[str] | None = None) -> int:
         print("Skipping draft pull request.", file=sys.stderr)
         return 0
 
+    repo_root = resolve_repo_root()
     files = fetch_pull_files(owner, repo, args.pr)
     anchors = commentable_from_files(files)
     diff_block = format_diff_for_prompt(files)
@@ -77,16 +85,27 @@ def run(argv: list[str] | None = None) -> int:
     docs_root = resolve_docs_root(Path(args.docs))
     docs = load_tech_docs(docs_root, changed_paths, diff_block)
     docs_block = format_docs_for_prompt(docs)
+    conventions_block = load_project_conventions(repo_root)
 
     head = (pr.get("head") or {}).get("sha")
     if not head:
         raise SystemExit("PR payload missing head.sha")
+    base_sha = (pr.get("base") or {}).get("sha") or None
+    files_block = format_pr_file_context(
+        files,
+        repo_root,
+        base_sha=base_sha,
+        head_sha=head,
+        fetch_at_ref=lambda path, ref: fetch_file_at_ref(owner, repo, path, ref),
+    )
 
     result: ReviewResult = generate_review(
         title=pr.get("title") or "",
         body=pr.get("body") or "",
         diff_block=diff_block,
         docs_block=docs_block,
+        conventions_block=conventions_block,
+        files_block=files_block,
         anchors=anchors,
     )
     kept, dropped = filter_findings(result.findings, anchors)

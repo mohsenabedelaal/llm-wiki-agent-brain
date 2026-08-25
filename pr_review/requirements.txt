@@ -1,0 +1,4 @@
+# Minimal deps for the portable PR review Action (any repository).
+# Host projects may also install these via their own requirements.
+google-genai>=1.0.0
+pyyaml>=6.0.0

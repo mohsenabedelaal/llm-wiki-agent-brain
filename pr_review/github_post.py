@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import urllib.error
@@ -12,7 +13,7 @@ from typing import Any
 from .types import CommentAnchor, Finding, ReviewResult
 
 API_VERSION = "2022-11-28"
-USER_AGENT = "llm-wiki-agent-brain-pr-review"
+USER_AGENT = "pr-review-agent/1.0"
 
 
 class GitHubError(RuntimeError):
@@ -75,6 +76,29 @@ def fetch_pull_files(owner: str, repo: str, number: int) -> list[dict[str, Any]]
             break
         page += 1
     return files
+
+
+def fetch_file_at_ref(owner: str, repo: str, path: str, ref: str) -> str | None:
+    """Return UTF-8 file text at a commit SHA, or None if missing/binary/too large."""
+    encoded = urllib.parse.quote(path, safe="/")
+    qs = urllib.parse.urlencode({"ref": ref})
+    try:
+        payload = _api(
+            "GET",
+            f"https://api.github.com/repos/{owner}/{repo}/contents/{encoded}?{qs}",
+        )
+    except GitHubError:
+        return None
+    if not isinstance(payload, dict) or payload.get("type") != "file":
+        return None
+    encoding = payload.get("encoding")
+    content = payload.get("content")
+    if encoding == "base64" and isinstance(content, str):
+        raw = base64.b64decode(content)
+        if b"\x00" in raw[:1024]:
+            return None
+        return raw.decode("utf-8", errors="replace")
+    return None
 
 
 def filter_findings(

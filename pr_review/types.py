@@ -24,7 +24,8 @@ class Finding:
     path: str
     body: str
     severity: str
-    doc_path: str
+    category: str = "correctness"
+    doc_path: str | None = None
     line: int | None = None
     side: str = "RIGHT"
     section: str | None = None
@@ -34,10 +35,13 @@ class Finding:
         return self.line is None
 
     def comment_body(self) -> str:
-        cite = f"`{self.doc_path}`"
-        if self.section:
-            cite += f" ({self.section})"
-        return f"**{self.severity}** — {self.body.strip()}\n\nGrounded in {cite}."
+        header = f"**{self.severity}** · `{self.category}` — {self.body.strip()}"
+        if self.doc_path:
+            cite = f"`{self.doc_path}`"
+            if self.section:
+                cite += f" ({self.section})"
+            return f"{header}\n\nGrounded in {cite}."
+        return header
 
 
 @dataclass

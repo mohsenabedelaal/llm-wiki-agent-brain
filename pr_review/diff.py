@@ -92,7 +92,7 @@ def commentable_from_unified_diff(diff_text: str) -> set[CommentAnchor]:
     return anchors
 
 
-def format_diff_for_prompt(files: Iterable[dict], max_chars: int = 60_000) -> str:
+def format_diff_for_prompt(files: Iterable[dict], max_chars: int = 120_000) -> str:
     """Render PR file patches as a single prompt block, truncated if needed."""
     parts: list[str] = []
     used = 0

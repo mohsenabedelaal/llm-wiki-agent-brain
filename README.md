@@ -116,7 +116,7 @@ flowchart LR
 | Session save (file Q&A back into vault)                             | Ready                      |
 | Obsidian graph view                                                 | Ready (open repo as vault) |
 | Path sandbox tests + PDF extraction tests                           | Ready (`pytest -q`)        |
-| Docs-grounded GitHub PR review (inline comments vs `docs/tech/`)    | Ready (Actions + `python -m pr_review`) |
+| Portable GitHub PR review (lead-style + optional `docs/tech/`)       | Ready (Actions + `python -m pr_review`) |
 | Official tech-docs fetcher agent (`docs_fetcher_agent`)             | Ready (`adk run docs_fetcher_agent`) |
 | Scanned-PDF OCR                                                     | Not in v1                  |
 | Multi-writer concurrency locks                                      | Not in v1                  |
@@ -201,17 +201,17 @@ llm-wiki-agent-brain/
 ├── docs/tech/                  Official framework docs for PR review
 │   ├── manifest.yaml           Stack → URL + local folder
 │   └── <stack>/                Markdown snapshots (ADK, Gemini, pypdf, pytest)
-├── pr_review/                  CI one-shot: Gemini review → inline GitHub comments
+├── pr_review/                  Portable CI PR reviewer (any repo) → inline comments
 ├── docs_fetcher_agent/         ADK agent: fetch/refresh docs/tech from the manifest
 ├── wiki_agent/                 Google ADK package
 │   ├── agent.py                root_agent (Gemini + tools)
 │   ├── prompts.py              Ingest / query / lint / save playbooks
 │   └── tools/vault.py          Path-safe file + PDF tools
 ├── scripts/                    adk_demo · build_sample_pdf (test fixture helper)
-├── tests/                      Path sandbox + PDF extraction
+├── tests/                      Path sandbox + PDF extraction + PR review
 ├── AGENTS.md                   Wiki agent rules (source of truth)
 ├── WIKI.md                     Vault schema conventions
-└── .github/workflows/          pr-docs-review.yml
+└── .github/workflows/          pr-docs-review.yml (portable PR review)
 ```
 
 ---
@@ -232,7 +232,8 @@ llm-wiki-agent-brain/
 
 ## Docs
 
-- [docs/tech/README.md](docs/tech/README.md) — official tech-doc corpus + PR review Action
+- [pr_review/README.md](pr_review/README.md) — portable PR reviewer + docs fetcher (any repo)
+- [docs/tech/README.md](docs/tech/README.md) — official tech-doc corpus
 - [AGENTS.md](AGENTS.md) — wiki agent rules
 - [WIKI.md](WIKI.md) — vault conventions
 - [Google ADK](https://adk.dev/) — framework
