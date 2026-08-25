@@ -209,8 +209,11 @@ def write_file(path: str, content: str) -> dict[str, Any]:
     """
     try:
         target = _resolve(path)
+        if _is_under(target, RAW_ROOT) or path.replace("\\", "/").startswith("raw/"):
+            return _err("Writes to raw/ are forbidden. raw/ is immutable.")
+        if not _is_under(target, WIKI_ROOT):
+            return _err("Writes are only allowed under wiki/.")
         if target.suffix.lower() not in {".md", ".txt", ""}:
-            return _err("Only write .md (or .txt) under wiki/ in v1.")
             return _err("Only write .md (or .txt) under wiki/ in v1.")
 
         target.parent.mkdir(parents=True, exist_ok=True)
