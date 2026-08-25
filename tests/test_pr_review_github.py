@@ -67,6 +67,7 @@ def test_review_payload_requests_changes_on_blocker() -> None:
                 line=18,
                 side="RIGHT",
                 severity="blocker",
+                category="api-docs",
                 body="Tools must return JSON-serializable dicts.",
                 doc_path="docs/tech/google-adk/tools.md",
                 section="Function tools",
@@ -92,6 +93,7 @@ def test_review_payload_comments_when_no_blockers() -> None:
                 line=19,
                 side="RIGHT",
                 severity="nit",
+                category="maintainability",
                 body="Consider a shorter description.",
                 doc_path="docs/tech/google-adk/agents.md",
             )
@@ -100,3 +102,19 @@ def test_review_payload_comments_when_no_blockers() -> None:
     payload = build_review_payload("def456", review)
     assert payload["event"] == "COMMENT"
     assert len(payload["comments"]) == 1
+
+
+def test_finding_without_doc_cite() -> None:
+    finding = Finding(
+        path="wiki_agent/agent.py",
+        line=18,
+        side="RIGHT",
+        severity="should-fix",
+        category="regression",
+        body="Callers still pass the old return shape.",
+        doc_path=None,
+    )
+    body = finding.comment_body()
+    assert "regression" in body
+    assert "Grounded in" not in body
+    assert "Callers still pass" in body

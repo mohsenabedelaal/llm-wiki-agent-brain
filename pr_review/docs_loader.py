@@ -41,8 +41,12 @@ def load_manifest(docs_root: Path) -> dict[str, Any]:
     if not path.is_file():
         raise FileNotFoundError(f"Missing manifest under {docs_root.as_posix()}/manifest.yaml")
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(data, dict) or not data.get("sources"):
-        raise ValueError("manifest.yaml must contain a sources list")
+    if not isinstance(data, dict):
+        raise ValueError("manifest.yaml must be a mapping with optional sources list")
+    if "sources" not in data:
+        data["sources"] = []
+    if not isinstance(data["sources"], list):
+        raise ValueError("manifest.yaml sources must be a list")
     return data
 
 
@@ -72,9 +76,36 @@ def load_tech_docs(
     diff_text: str = "",
     budget_chars: int = DEFAULT_DOCS_BUDGET,
 ) -> list[TechDoc]:
-    """Return scored, budgeted markdown docs. Higher-scoring stacks first."""
+    """Return scored, budgeted markdown docs. Higher-scoring stacks first.
+
+    Missing or empty docs trees are allowed — the reviewer still runs on
+    general engineering judgment without official tech docs.
+    """
+    if not docs_root.is_dir():
+        return []
+    manifest_path = docs_root / "manifest.yaml"
+    if not manifest_path.is_file():
+        # Fall back: load any markdown under the docs root without a manifest.
+        docs: list[TechDoc] = []
+        for md in sorted(docs_root.rglob("*.md")):
+            if md.name.lower() == "readme.md":
+                continue
+            rel = md.relative_to(docs_root).as_posix()
+            prefix = _display_docs_root(docs_root)
+            docs.append(
+                TechDoc(
+                    rel_path=f"{prefix}/{rel}",
+                    source_id=md.parent.name,
+                    title=md.stem,
+                    url="",
+                    content=md.read_text(encoding="utf-8", errors="replace"),
+                    score=0,
+                )
+            )
+        return _budget(docs, budget_chars)
+
     manifest = load_manifest(docs_root)
-    docs: list[TechDoc] = []
+    docs = []
     for source in manifest["sources"]:
         local_dir = str(source.get("local_dir") or source.get("id") or "")
         folder = docs_root / local_dir

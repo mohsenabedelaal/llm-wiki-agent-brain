@@ -16,13 +16,11 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCS_TECH_ROOT = REPO_ROOT / "docs" / "tech"
 MANIFEST_PATH = DOCS_TECH_ROOT / "manifest.yaml"
-RAW_ROOT = REPO_ROOT / "raw"
-WIKI_ROOT = REPO_ROOT / "wiki"
 
 MAX_READ_CHARS = 200_000
 MAX_FETCH_BYTES = 2_000_000
 FETCH_TIMEOUT_S = 30
-USER_AGENT = "llm-wiki-agent-brain-docs-fetcher/1.0"
+USER_AGENT = "pr-docs-fetcher/1.0"
 
 
 def _ok(**payload: Any) -> dict[str, Any]:
@@ -39,7 +37,7 @@ def _resolve(path: str) -> Path:
     try:
         candidate.relative_to(REPO_ROOT.resolve())
     except ValueError as exc:
-        raise ValueError(f"Path escapes vault root: {path}") from exc
+        raise ValueError(f"Path escapes repository root: {path}") from exc
     return candidate
 
 
@@ -265,10 +263,6 @@ def write_file(path: str, content: str) -> dict[str, Any]:
     """
     try:
         target = _resolve(path)
-        if _is_under(target, RAW_ROOT) or path.replace("\\", "/").startswith("raw/"):
-            return _err("Writes to raw/ are forbidden.")
-        if _is_under(target, WIKI_ROOT) or path.replace("\\", "/").startswith("wiki/"):
-            return _err("Writes to wiki/ are forbidden. Use the wiki agent for that vault.")
         if not _is_under(target, DOCS_TECH_ROOT):
             return _err("Writes are only allowed under docs/tech/.")
         if target.suffix.lower() not in {".md", ".txt", ".yaml", ".yml"}:
@@ -312,8 +306,8 @@ def update_manifest(source_id: str, fetched_at: str = "", notes: str = "") -> di
             return _err(f"Unknown source id: {source_id}")
         header = (
             "# Official tech-doc corpus used by the PR review Action.\n"
-            "# Manual drops go under docs/tech/<id>/. The docs_fetcher_agent may refresh\n"
-            "# pages only from the `url` values listed here (or subpaths of those URLs).\n\n"
+            "# Entries may be added by hand or via `python -m docs_fetcher_agent --sync-manifest`\n"
+            "# (from project dependency files). The fetcher may only GET these URLs / subpaths.\n\n"
         )
         MANIFEST_PATH.write_text(
             header + yaml.safe_dump(data, sort_keys=False, allow_unicode=True),
@@ -323,3 +317,84 @@ def update_manifest(source_id: str, fetched_at: str = "", notes: str = "") -> di
         return _ok(path=_rel(MANIFEST_PATH), source_id=source_id, fetched_at=stamp)
     except OSError as exc:
         return _err(f"OS error: {exc}")
+
+
+def merge_manifest_sources(new_sources: list[dict[str, Any]]) -> dict[str, Any]:
+    """Add proposed sources that are not already in the manifest (match by id or url)."""
+    try:
+        MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+        data: dict[str, Any] = {"sources": []}
+        if MANIFEST_PATH.is_file():
+            loaded = yaml.safe_load(MANIFEST_PATH.read_text(encoding="utf-8")) or {}
+            if isinstance(loaded, dict):
+                data = loaded
+                data.setdefault("sources", [])
+        sources = [s for s in (data.get("sources") or []) if isinstance(s, dict)]
+        existing_ids = {str(s.get("id")) for s in sources}
+        existing_urls = {str(s.get("url") or "").rstrip("/") for s in sources}
+        added: list[str] = []
+        skipped: list[str] = []
+        for source in new_sources:
+            sid = str(source.get("id") or "")
+            url = str(source.get("url") or "").rstrip("/")
+            if not sid or not url:
+                continue
+            if sid in existing_ids or url in existing_urls:
+                skipped.append(sid)
+                continue
+            sources.append(source)
+            existing_ids.add(sid)
+            existing_urls.add(url)
+            added.append(sid)
+        data["sources"] = sources
+        header = (
+            "# Official tech-doc corpus used by the PR review Action.\n"
+            "# Entries may be added by hand or via `python -m docs_fetcher_agent --sync-manifest`\n"
+            "# (from project dependency files). The fetcher may only GET these URLs / subpaths.\n\n"
+        )
+        MANIFEST_PATH.write_text(
+            header + yaml.safe_dump(data, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+            newline="\n",
+        )
+        return _ok(
+            path=_rel(MANIFEST_PATH),
+            added=added,
+            skipped_existing=skipped,
+            total=len(sources),
+        )
+    except OSError as exc:
+        return _err(f"OS error: {exc}")
+
+
+def propose_from_project() -> dict[str, Any]:
+    """Read host dependency files and propose manifest entries (no web search)."""
+    from ..discover import propose_sources
+
+    proposals = propose_sources(REPO_ROOT)
+    return _ok(count=len(proposals), sources=proposals)
+
+
+def sync_manifest_from_project() -> dict[str, Any]:
+    """Merge proposed sources from dependency files into docs/tech/manifest.yaml."""
+    from ..discover import propose_sources
+
+    proposals = propose_sources(REPO_ROOT)
+    merged = merge_manifest_sources(proposals)
+    if merged.get("status") != "success":
+        return merged
+    return _ok(
+        proposed=len(proposals),
+        added=merged.get("added"),
+        skipped_existing=merged.get("skipped_existing"),
+        total=merged.get("total"),
+        path=merged.get("path"),
+    )
+
+
+def inspect_stack() -> dict[str, Any]:
+    """Detect the host repo's languages/tools from lockfiles (package.json, go.mod, …)."""
+    from ..stack import scan_stack
+
+    data = scan_stack(REPO_ROOT)
+    return _ok(**data)

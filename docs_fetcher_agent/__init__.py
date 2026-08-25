@@ -1,5 +1,1 @@
-"""Google ADK docs-fetcher agent package."""
-
-from . import agent
-
-__all__ = ["agent"]
+"""Official tech-docs fetcher (CLI + optional ADK agent)."""
